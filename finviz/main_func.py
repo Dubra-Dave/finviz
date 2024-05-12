@@ -12,6 +12,8 @@ STOCK_PAGE = {}
 
 
 def get_page(ticker):
+    #DE: It is bad practice to store things in a global variable like this.
+    # STOCK_PAGE should be a class - This is a to-do
     global STOCK_PAGE
 
     if ticker not in STOCK_PAGE:
@@ -32,31 +34,32 @@ def get_stock(ticker):
     get_page(ticker)
     page_parsed = STOCK_PAGE[ticker]
 
-    title = page_parsed.cssselect('table[class="fullview-title"]')[0]
-    keys = ["Ticker","Company", "Sector", "Industry", "Country"]
-    fields = [f.text_content() for f in title.cssselect('a[class="tab-link"]')]
-    data = dict(zip(keys, fields))
+    title = page_parsed.cssselect('div[class="fv-container py-2.5"]')[0]
+    data = {}
+    data["Ticker"] = title.cssselect('h1[class="js-recent-quote-ticker quote-header_ticker-wrapper_ticker"]')[
+        0].text_content().strip()
+    try:
+        company_details = title.cssselect('h2[class="quote-header_ticker-wrapper_company text-xl"]')[0]
+    except IndexError:
+        company_details = title.cssselect('h2[class="quote-header_ticker-wrapper_company"]')[0]
 
-    company_link = title.cssselect('a[class="tab-link"]')[0].attrib["href"]
+    data["Company"] = company_details.text_content().strip()
+    company_link = company_details.cssselect('a[class="tab-link block truncate"]')[0].attrib["href"]
     data["Website"] = company_link if company_link.startswith("http") else None
+    keys = ["Sector", "Industry", "Country", "Exchange"]
+    fields = [f.text_content() for f in title.cssselect('a[class="tab-link"]')]
+    data.update(dict(zip(keys, fields)))
 
+    excluded_strings = ['\r', '\n', '\r\n    ', '\r\n', 'Trades']
     all_rows = [
-        row.xpath("td//text()")
+        [item for item in row.xpath("td//text()") if item not in excluded_strings]
         for row in page_parsed.cssselect('tr[class="table-dark-row"]')
     ]
 
     for row in all_rows:
-        for column in range(0, 11, 2):
-            if row[column] == "EPS next Y" and "EPS next Y" in data.keys():
-                data["EPS growth next Y"] = row[column + 1]
-                continue
-            elif row[column] == "Volatility":
-                vols = row[column + 1].split()
-                data["Volatility (Week)"] = vols[0]
-                data["Volatility (Month)"] = vols[1]
-                continue
-
-            data[row[column]] = row[column + 1]
+        for column in range(0, len(row) - 1):
+            if column % 2 == 0:
+                data[row[column]] = row[column + 1]
 
     return data
 
@@ -68,24 +71,22 @@ def get_insider(ticker):
     :param ticker: stock symbol
     :return: list
     """
-
     get_page(ticker)
     page_parsed = STOCK_PAGE[ticker]
-    outer_table = page_parsed.cssselect('table[class="body-table insider-trading-table"]')
+    outer_table = page_parsed.cssselect('table[class="body-table styled-table-new is-rounded p-0 mt-2"]')
+    data = []
 
-    if len(outer_table) == 0:
-        return []
-
-    table = outer_table[0]
-    headers = table[0].xpath("td//text()")
-
-    data = [dict(zip(
-        headers,
-        [etree.tostring(elem, method="text", encoding="unicode") for elem in row]
-    )) for row in table[1:]]
-
+    try:
+        table = outer_table[0]
+        headers = table[0].xpath(".//th//text()")
+        data = [dict(zip(
+            headers,
+            [etree.tostring(elem, method="text", encoding="unicode") for elem in row]
+        )) for row in table[1:]]
+    except Exception as e:
+        pass
+        traceback.print_exception(type(e), e, e.__traceback__)
     return data
-
 
 def get_news(ticker):
     """
