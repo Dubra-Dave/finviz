@@ -139,19 +139,20 @@ def get_all_news():
     return list(zip(all_dates, all_headlines, all_links))
 
 
-def get_crypto(pair):
+def get_crypto():
     """
-
-    :param pair: crypto pair
-    :return: dictionary
+    :return: dictionary of all crypto pairs
     """
-
     page_parsed, _ = http_request_get(url=CRYPTO_URL, parse=True)
     page_html, _ = http_request_get(url=CRYPTO_URL, parse=False)
-    crypto_headers = page_parsed.cssselect('tr[valign="middle"]')[0].xpath("td//text()")
-    crypto_table_data = get_table(page_html, crypto_headers)
+    crypto_headers = page_parsed.cssselect('tr[valign="middle"]')[0].xpath("th//text()")
 
-    return crypto_table_data[pair]
+    excluded_strings = ['\r', '\n', '\r\n    ', '\r\n', 'Trades']
+    crypto_headers = [
+        header for header in crypto_headers if header not in excluded_strings
+    ]
+    crypto_table_data = get_table(page_html, crypto_headers)
+    return crypto_table_data
 
 
 def get_analyst_price_targets(ticker, last_ratings=5):
