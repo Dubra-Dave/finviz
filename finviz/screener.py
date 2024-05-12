@@ -12,7 +12,8 @@ from finviz.helper_functions.display_functions import create_table_string
 from finviz.helper_functions.error_handling import InvalidTableType, NoResults
 from finviz.helper_functions.request_functions import (Connector,
                                                        http_request_get,
-                                                       sequential_data_scrape)
+                                                       sequential_data_scrape,
+                                                       sequential_analyst_scrape)
 from finviz.helper_functions.save_data import export_to_csv, export_to_db
 
 TABLE_TYPES = {
@@ -328,13 +329,12 @@ class Screener(object):
         if len(self.analysis) > 0:
             export_to_csv(
                 [
-                    "ticker",
-                    "date",
-                    "category",
-                    "analyst",
-                    "rating",
-                    "price_from",
-                    "price_to",
+                    "Ticker",
+                    "Date",
+                    "Action",
+                    "Analyst",
+                    "Rating Change",
+                    "Price Target Change"
                 ],
                 self.analysis,
                 f"{filename}-analysts.csv",
@@ -373,7 +373,6 @@ class Screener(object):
         """
         Downloads the details of all tickers shown by the table.
         """
-
         ticker_data = sequential_data_scrape(
             scrape.download_ticker_details,
             [
@@ -383,17 +382,32 @@ class Screener(object):
             self._user_agent,
         )
 
-        for entry in ticker_data:
-            for key, value in entry.items():
+        for ticker_data_item in ticker_data:
+            for ticker_key, value in ticker_data_item.items():
+                print("Processing: ", list(ticker_key)[0])
+                # value[0] = dictionary of financial information on the stock
+                # value[1] = dictionary of analyst ratings
+                self.analysis.extend(value[1])
                 for ticker_generic in self.data:
-                    if ticker_generic.get("Ticker") == key:
-                        if "Sales" not in self.headers:
+                    if ticker_generic.get("Ticker") == list(ticker_key)[0]:
+                        if "Ticker" not in self.headers:
                             self.headers.extend(list(value[0].keys()))
-
                         ticker_generic.update(value[0])
-                        self.analysis.extend(value[1])
-
         return self.data
+
+    def get_analyst_ratings(self):
+        """
+        Downloads the details of all tickers shown by the table.
+        """
+        screener_ratings = sequential_analyst_scrape(
+            scrape.get_analyst_price_targets_for_export,
+            [
+                f"https://finviz.com/quote.ashx?&t={row.get('Ticker')}"
+                for row in self.data
+            ],
+            self._user_agent
+        )
+        return screener_ratings
 
     def __check_rows(self):
         """
@@ -414,7 +428,7 @@ class Screener(object):
         """ Private function used to return table headers. """
         headers = []
 
-        header_elements = self._page_content.cssselect('tr[valign="middle"]')[0].xpath("td")
+        header_elements = self._page_content.cssselect('tr[valign="middle"]')[0].xpath("th")
         
         for header_element in header_elements:
             # Use normalize-space to extract text content while ignoring internal elements

@@ -50,8 +50,8 @@ def http_request_get(
         raise ConnectionTimeout(url)
 
 
-@tenacity.retry(wait=tenacity.wait_exponential())
-def finviz_request(url: str, user_agent: str) -> Response:
+#@tenacity.retry(wait=tenacity.wait_exponential())
+def finviz_request(url: str, user_agent = generate_user_agent()) -> Response:
     response = requests.get(url, headers={"User-Agent": user_agent})
     if response.text == "Too many requests.":
         raise Exception("Too many requests.")
@@ -70,9 +70,22 @@ def sequential_data_scrape(
             data.append(scrape_func(response, *args, **kwargs))
         except Exception as exc:
             raise exc
-
     return data
 
+def sequential_analyst_scrape(
+    scrape_func: Callable, urls: List[str], user_agent: str, *args, **kwargs
+) -> List[Dict]:
+    data = []
+
+    for url in tqdm(urls, disable="DISABLE_TQDM" in os.environ):
+        try:
+            response = finviz_request(url, user_agent)
+            kwargs["URL"] = url
+            ticker = kwargs["URL"].split("=")[1]
+            data.append(scrape_func(ticker=ticker, page_content=html.fromstring(response.text)))
+        except Exception as exc:
+            raise exc
+    return data
 
 class Connector:
     """ Used to make asynchronous HTTP requests. """

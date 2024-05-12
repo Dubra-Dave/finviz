@@ -3,6 +3,7 @@ import os
 import time
 
 import requests
+import traceback
 from lxml import etree, html
 
 
@@ -83,25 +84,24 @@ def download_chart_image(page_content: requests.Response, **kwargs):
 
 
 def get_analyst_price_targets_for_export(
-    ticker=None, page_content=None, last_ratings=5
+    ticker=None, page_content=None, last_ratings=50
 ):
     analyst_price_targets = []
 
     try:
-        table = page_content.cssselect('table[class="fullview-ratings-outer"]')[0]
-        ratings_list = [row.xpath("td//text()") for row in table]
+        table = page_content.cssselect('table.js-table-ratings')[0]
+        ratings_list = [row.xpath("td//text()") for row in table if len(row.xpath("td//text()")) > 0]
         ratings_list = [
             [val for val in row if val != "\n"] for row in ratings_list
         ]  # remove new line entries
 
         headers = [
-            "ticker",
-            "date",
-            "category",
-            "analyst",
-            "rating",
-            "price_from",
-            "price_to",
+            "Ticker",
+            "Date",
+            "Action",
+            "Analyst",
+            "Rating Change",
+            "Price Target Change"
         ]  # header names
         count = 0
 
@@ -136,8 +136,9 @@ def get_analyst_price_targets_for_export(
             data = dict(zip(headers, elements))
             analyst_price_targets.append(data)
             count += 1
-    except Exception:
+    except Exception as e:
         pass
+        traceback.print_exception(type(e), e, e.__traceback__)
 
     return analyst_price_targets
 
@@ -147,13 +148,19 @@ def download_ticker_details(page_content: requests.Response, **kwargs):
     ticker = kwargs["URL"].split("=")[1]
     page_parsed = html.fromstring(page_content.text)
 
+    #all_rows = [
+    #    row.xpath("td//text()")
+    #    for row in page_parsed.cssselect('tr[class="table-dark-row"]')
+    #]
+
+    excluded_strings = ['\r', '\n', '\r\n    ', '\r\n', 'Trades']
     all_rows = [
-        row.xpath("td//text()")
+        [item for item in row.xpath("td//text()") if item not in excluded_strings]
         for row in page_parsed.cssselect('tr[class="table-dark-row"]')
     ]
 
     for row in all_rows:
-        for column in range(0, 11):
+        for column in range(0, len(row)-1):
             if column % 2 == 0:
                 data[row[column]] = row[column + 1]
 
