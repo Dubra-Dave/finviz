@@ -1,4 +1,5 @@
 from datetime import datetime
+import traceback
 
 from lxml import etree
 
@@ -108,22 +109,15 @@ def get_news(ticker):
     results = []
     date = None
     for row in rows:
-        raw_timestamp = row.xpath("./td")[0].xpath("text()")[0][0:-2]
-
-        if len(raw_timestamp) > 8:
-            parsed_timestamp = datetime.strptime(raw_timestamp, "%b-%d-%y %I:%M%p")
-            date = parsed_timestamp.date()
-        else:
-            parsed_timestamp = datetime.strptime(raw_timestamp, "%I:%M%p").replace(
-                year=date.year, month=date.month, day=date.day)
-
-        results.append((
-            parsed_timestamp.strftime("%Y-%m-%d %H:%M"),
-            row.xpath("./td")[1].cssselect('a[class="tab-link-news"]')[0].xpath("text()")[0],
-            row.xpath("./td")[1].cssselect('a[class="tab-link-news"]')[0].get("href"),
-            row.xpath("./td")[1].cssselect('div[class="news-link-right"] span')[0].xpath("text()")[0][1:]
-        ))
-
+        try:
+            results.append((
+                row.xpath("./td")[1].cssselect('a[class="tab-link-news"]')[0].xpath("text()")[0],
+                row.xpath("./td")[1].cssselect('a[class="tab-link-news"]')[0].get("href"),
+                row.xpath("./td")[1].cssselect('div[class="news-link-right"] span')[0].xpath("text()")[0][1:]
+            ))
+        except Exception as e:
+            pass
+            traceback.print_exception(type(e), e, e.__traceback__)
     return results
 
 
