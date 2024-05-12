@@ -126,18 +126,16 @@ def get_all_news():
     Returns a list of sets containing time, headline and url
     :return: list
     """
-
     page_parsed, _ = http_request_get(url=NEWS_URL, parse=True)
     all_dates = [
-        row.text_content() for row in page_parsed.cssselect('td[class="nn-date"]')
+        row.text_content() for row in page_parsed.cssselect('td.news_date-cell')
     ]
     all_headlines = [
-        row.text_content() for row in page_parsed.cssselect('a[class="nn-tab-link"]')
+        row.text_content() for row in page_parsed.cssselect('a.tab-link')
     ]
     all_links = [
-        row.get("href") for row in page_parsed.cssselect('a[class="nn-tab-link"]')
+        row.get("href") for row in page_parsed.cssselect('a.tab-link')
     ]
-
     return list(zip(all_dates, all_headlines, all_links))
 
 
