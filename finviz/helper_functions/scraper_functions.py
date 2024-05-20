@@ -125,10 +125,17 @@ def get_analyst_price_targets_for_export(
                     )  # both '_from' & '_to' prices available
                     price_to = strings[1].strip(" ").strip("$")
 
-            elements = [
-                ticker,
-                datetime.datetime.strptime(row[0], "%b-%d-%y").strftime("%Y-%m-%d"),
-            ]
+            if 'Today' in row[0]:
+                parsed_timestamp = datetime.datetime.now()
+                elements = [
+                    ticker,
+                    parsed_timestamp,
+                ]
+            else:
+                elements = [
+                    ticker,
+                    datetime.datetime.strptime(row[0], "%b-%d-%y").strftime("%Y-%m-%d"),
+                ]
             elements.extend(row[1:3])
             elements.append(row[3].replace("→", "->"))
             elements.append(price_from)
